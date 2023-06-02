@@ -1,6 +1,6 @@
 // BRAINFUCK INTERPRETER IN C
 // Has cell array wrap (if you go left from the first cell you reach the last cell and viceversa)
-// Has cell value wrap (it works with chars [bytes] and positive numbers. 0 - 1 = 127 and 127 + 1 = 0)
+// Has cell value wrap (it works with chars [bytes] and positive numbers. MIN_CELL_VALUE - 1 = MAX_CELL_VALUE and MAX_CELL_VALUE + 1 = MIN_CELL_VALUE)
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -8,21 +8,21 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 
+#define UNUSED __attribute__((unused))
+
 #define MAX_MEMORY_SIZE 30000
 #define MAX_STACK_SIZE 1000
 #define MIN_CELL_VALUE 0
 #define MAX_CELL_VALUE 127
 
-char* currInstruction;
-
 struct stack {
     int top;
-    int stack[MAX_STACK_SIZE];
+    char* stack[MAX_STACK_SIZE];
 } loopTracker = {-1, {0}};
 
 struct data {
     int currentCell;
-    char memory[MAX_MEMORY_SIZE];
+    char cell[MAX_MEMORY_SIZE];
 } dataMemory = {0, {0}};
 
 int openFile(char* fileName)
@@ -37,9 +37,9 @@ int openFile(char* fileName)
     return fd;
 }
 
-void getFileStats(int fd, struct stat* info)
+void getFileStats(int fd, struct stat* fileInfo)
 {
-    if (fstat(fd, info) < 0){
+    if (fstat(fd, fileInfo) < 0){
         printf("Error: couldn't get file information\n");
         exit(1);
     }
@@ -57,8 +57,8 @@ char* memoryMapFile(int fileSize, int fd)
 
 void unmap(char* memMap, int fileSize)
 {
-    int err = munmap(memMap, fileSize);
-    if(err != 0){
+    int error = munmap(memMap, fileSize);
+    if(error != 0){
         printf("Error: couldn't unmap file\n");
         exit(1);
     }
@@ -86,27 +86,27 @@ void moveCurrentCellLeft()
 
 void addToCurrentCell()
 {
-    if (dataMemory.memory[dataMemory.currentCell] >= MAX_CELL_VALUE){
-        dataMemory.memory[dataMemory.currentCell] = MIN_CELL_VALUE;
+    if (dataMemory.cell[dataMemory.currentCell] >= MAX_CELL_VALUE){
+        dataMemory.cell[dataMemory.currentCell] = MIN_CELL_VALUE;
         return;
     }
 
-    dataMemory.memory[dataMemory.currentCell]++;
+    dataMemory.cell[dataMemory.currentCell]++;
 }
 
 void subtractFromCurrentCell()
 {
-    if (dataMemory.memory[dataMemory.currentCell] <= MIN_CELL_VALUE){
-        dataMemory.memory[dataMemory.currentCell] = MAX_CELL_VALUE;
+    if (dataMemory.cell[dataMemory.currentCell] <= MIN_CELL_VALUE){
+        dataMemory.cell[dataMemory.currentCell] = MAX_CELL_VALUE;
         return;
     }
 
-    dataMemory.memory[dataMemory.currentCell]--;
+    dataMemory.cell[dataMemory.currentCell]--;
 }
 
 void printCurrentCellValue ()
 {
-    printf("%c\n", dataMemory.memory[dataMemory.currentCell]);
+    printf("%c", dataMemory.cell[dataMemory.currentCell]);
 }
 
 void readToCurrentCell ()
@@ -119,13 +119,29 @@ void readToCurrentCell ()
     if (cat < MIN_CELL_VALUE){
         cat = MIN_CELL_VALUE;
     }
-    
-    dataMemory.memory[dataMemory.currentCell] = cat;
+
+    dataMemory.cell[dataMemory.currentCell] = cat;
 }
 
-void executeInstruction()
+void startLoop (char* currInstruction)
 {
-    switch (*currInstruction){
+    loopTracker.top++;
+    loopTracker.stack[loopTracker.top] = currInstruction;
+}
+
+void loopEnd (char** currInstruction)
+{
+    if (dataMemory.cell[dataMemory.currentCell] == 0){
+        loopTracker.top--;
+        return;
+    }
+
+    *currInstruction = loopTracker.stack[loopTracker.top];
+}
+
+void executeInstruction(char** currInstruction)
+{
+    switch (**currInstruction){
         case '<':
             moveCurrentCellLeft();
             break;
@@ -151,11 +167,11 @@ void executeInstruction()
             break;
 
         case '[':
-            startLoop();
+            startLoop(*currInstruction);
             break;
 
         case ']':
-            loopEnd();
+            loopEnd(currInstruction);
             break;
 
         default:
@@ -163,34 +179,22 @@ void executeInstruction()
     }
 }
 
-void startLoop ()
+int main(UNUSED int argc, char** argv)
 {
+    int programFileDescriptor = openFile(argv[1]);
 
-}
+    struct stat programFileInfo;
+    getFileStats(programFileDescriptor, &programFileInfo);
 
-void loopEnd ()
-{
+    char* firstInstruction = memoryMapFile(programFileInfo.st_size, programFileDescriptor);
+    char* currInstruction = firstInstruction;
 
-}
-
-int main(int argc, char** argv)
-{
-    //Open and map program
-    int program_fd = openFile(argv[1]);
-
-    struct stat info;
-    getFileStats(program_fd, &info);
-
-    char* instructions = memoryMapFile(info.st_size, program_fd);
-    currInstruction = instructions;
-
-    //Execute program
-    while (currInstruction != instructions+info.st_size){
-        executeInstruction();
+    while (currInstruction != firstInstruction+programFileInfo.st_size){
+        executeInstruction(&currInstruction);
         currInstruction++;
     }
 
-    //End program
-    unmap(instructions, info.st_size);
+    unmap(firstInstruction, programFileInfo.st_size);
+
     return 0;
 }
