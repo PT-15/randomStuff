@@ -25,7 +25,7 @@ struct data {
     char cell[MAX_MEMORY_SIZE];
 } dataMemory = {0, {0}};
 
-int openFile(char* fileName)
+int getFileDescriptor(char* fileName)
 {
     int fd = open(fileName, O_RDONLY);
 
@@ -181,7 +181,7 @@ void executeInstruction(char** currInstruction)
 
 int main(UNUSED int argc, char** argv)
 {
-    int programFileDescriptor = openFile(argv[1]);
+    int programFileDescriptor = getFileDescriptor(argv[1]);
 
     struct stat programFileInfo;
     getFileStats(programFileDescriptor, &programFileInfo);
