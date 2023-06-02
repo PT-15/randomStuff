@@ -202,8 +202,10 @@ int main(UNUSED int argc, char** argv)
     char* currInstruction = firstInstruction;
 
     while (currInstruction < firstInstruction+programFileInfo.st_size){
-        if (*currInstruction != 'O')
+        if (*currInstruction != 'O'){
+            currInstruction++;
             continue;
+        }
 
         executeInstruction(&currInstruction);
         currInstruction += 10;
