@@ -7,7 +7,6 @@ set(CMAKE_C_FLAGS "-Wall -Wextra -O2")
 
 #set(CMAKE_VERBOSE_MAKEFILE on)
 
-set(SOURCES
-    brainfuckInterpreter.c)
-
-add_executable(brainfuckInterpreter ${SOURCES})
+add_executable(brainfuckInterpreter brainfuckInterpreter.c)
+add_executable(ookInterpreter ookInterpreter.c)
+add_executable(ookToBrainfuckTranslator ookToBrainfuckTranslator.c)
