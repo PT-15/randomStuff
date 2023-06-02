@@ -13,6 +13,8 @@
 #define MIN_CELL_VALUE 0
 #define MAX_CELL_VALUE 127
 
+char* currInstruction;
+
 struct stack {
     int top;
     int stack[MAX_STACK_SIZE];
@@ -22,6 +24,45 @@ struct data {
     int currentCell;
     char memory[MAX_MEMORY_SIZE];
 } dataMemory = {0, {0}};
+
+int openFile(char* fileName)
+{
+    int fd = open(fileName, O_RDONLY);
+
+    if(fd < 0){
+        printf("Error: couldn't get file descriptor\n");
+        exit(1);
+    }
+
+    return fd;
+}
+
+void getFileStats(int fd, struct stat* info)
+{
+    if (fstat(fd, info) < 0){
+        printf("Error: couldn't get file information\n");
+        exit(1);
+    }
+}
+
+char* memoryMapFile(int fileSize, int fd)
+{
+    char *pointerToMemory = mmap(NULL, fileSize, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (pointerToMemory == MAP_FAILED){
+        printf("Error: couldn't map file\n");
+        exit(1);
+    }
+    return pointerToMemory;
+}
+
+void unmap(char* memMap, int fileSize)
+{
+    int err = munmap(memMap, fileSize);
+    if(err != 0){
+        printf("Error: couldn't unmap file\n");
+        exit(1);
+    }
+}
 
 void moveCurrentCellRight ()
 {
@@ -65,22 +106,26 @@ void subtractFromCurrentCell()
 
 void printCurrentCellValue ()
 {
-    printf("Instruction received\n");
-    printf("%c", dataMemory.memory[dataMemory.currentCell]);
+    printf("%c\n", dataMemory.memory[dataMemory.currentCell]);
 }
 
 void readToCurrentCell ()
 {
-    printf("Instruction received\n");
-    char cat;
-    scanf("%c", &cat);
-    printf("Input was %c\n", cat);
-    //scanf("%c", &dataMemory.memory[dataMemory.currentCell]);
+    int cat;
+    scanf("%d", &cat);
+    if (cat > MAX_CELL_VALUE){
+        cat = MAX_CELL_VALUE;
+    }
+    if (cat < MIN_CELL_VALUE){
+        cat = MIN_CELL_VALUE;
+    }
+    
+    dataMemory.memory[dataMemory.currentCell] = cat;
 }
 
-void executeInstruction(char instruction)
+void executeInstruction()
 {
-    switch (instruction){
+    switch (*currInstruction){
         case '<':
             moveCurrentCellLeft();
             break;
@@ -128,68 +173,24 @@ void loopEnd ()
 
 }
 
-int openFile(char* fileName)
-{
-    int fd = open(fileName, O_RDONLY);
-
-    if(fd < 0){
-        printf("Error: couldn't get file descriptor\n");
-        exit(1);
-    }
-
-    return fd;
-}
-
-void getFileStats(int fd, struct stat* info)
-{
-    if (fstat(fd, info) < 0){
-        printf("Error: couldn't get file information\n");
-        exit(1);
-    }
-}
-
-char* memoryMapFile(int fileSize, int fd)
-{
-    char *pointerToMemory = mmap(NULL, fileSize, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (pointerToMemory == MAP_FAILED){
-        printf("Error: couldn't map file\n");
-        exit(1);
-    }
-    return pointerToMemory;
-}
-
-void unmap(char* memMap, int fileSize)
-{
-    int err = munmap(memMap, fileSize);
-    if(err != 0){
-        printf("Error: couldn't unmap file\n");
-        exit(1);
-    }
-}
-
 int main(int argc, char** argv)
 {
+    //Open and map program
     int program_fd = openFile(argv[1]);
 
     struct stat info;
     getFileStats(program_fd, &info);
 
-    printf("Size of file %ld\n", info.st_size);
+    char* instructions = memoryMapFile(info.st_size, program_fd);
+    currInstruction = instructions;
 
-    char* instruction = memoryMapFile(info.st_size, program_fd);
-
-    char* it = instruction;
-    for(int i = 0; i < info.st_size; i++){
-        printf("%c", *it);
-        it++;
-    }
-    printf("\nAnother way\n");
-    for(it = instruction; it < instruction + info.st_size; it++){
-        printf("%c", *it);
+    //Execute program
+    while (currInstruction != instructions+info.st_size){
+        executeInstruction();
+        currInstruction++;
     }
 
-    unmap(instruction, info.st_size);
-
-
+    //End program
+    unmap(instructions, info.st_size);
     return 0;
 }
