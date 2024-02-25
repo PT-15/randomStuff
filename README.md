@@ -5,3 +5,5 @@
 - **wordmakinator:** program that gives you all the words in a given dictionary that correspond to the given characteristics. Created as aid for [Wordle](https://www.nytimes.com/games/wordle/index.html)
 
 - **mastermind:** a mastermind game made in C
+
+- **brainfuck:** interpreter for the brainfuck isolanguage and one of its versions.
